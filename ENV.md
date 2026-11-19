@@ -181,6 +181,24 @@ Agent top-level keys use single underscore. Nested keys use `__` (double undersc
 | `SERVERBEE_LOG__LEVEL` | `log.level` | string | `info` | Log level: `trace`, `debug`, `info`, `warn`, `error` |
 | `SERVERBEE_LOG__FILE` | `log.file` | string | `""` | Log file path. Empty means stdout only |
 
+### Interface Traffic Accounting (Linux)
+
+| Environment Variable | TOML Key | Type | Default | Description |
+|---------------------|----------|------|---------|-------------|
+| `SERVERBEE_COLLECTOR__TRAFFIC__ENABLED` | `collector.traffic.enabled` | bool | `false` | Enable continuous, per-interface accounting after seeding a local ledger |
+| `SERVERBEE_COLLECTOR__TRAFFIC__INCLUDE` | `collector.traffic.include` | string[] | `[]` | Exact interface names. Empty selects all observed interfaces before exclusion |
+| `SERVERBEE_COLLECTOR__TRAFFIC__EXCLUDE` | `collector.traffic.exclude` | string[] | `[]` | Exact interface names to exclude, overriding inclusion |
+| `SERVERBEE_COLLECTOR__TRAFFIC__STRICT` | `collector.traffic.strict` | bool | `true` | Withhold reports when a required included interface is missing |
+| `SERVERBEE_COLLECTOR__TRAFFIC__REPORT` | `collector.traffic.report` | string | `"raw"` | Durable cumulative pair sent to the Server, either `raw` or `billing` |
+| `SERVERBEE_COLLECTOR__TRAFFIC__STATE_DIR` | `collector.traffic.state_dir` | string | `"/var/lib/serverbee/traffic"` | Absolute path to a dedicated local directory, owned by the Agent user and mode `0700` |
+| `SERVERBEE_COLLECTOR__TRAFFIC__FLUSH_INTERVAL_SECS` | `collector.traffic.flush_interval_secs` | u64 | `30` | Checkpoint interval in seconds (5–3600) |
+| `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__RX_TO_IN_PPM` | `collector.traffic.weights.<interface>.rx_to_in_ppm` | u64 | `1000000` | Weight from received bytes to billing inbound |
+| `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__RX_TO_OUT_PPM` | `collector.traffic.weights.<interface>.rx_to_out_ppm` | u64 | `0` | Weight from received bytes to billing outbound |
+| `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__TX_TO_IN_PPM` | `collector.traffic.weights.<interface>.tx_to_in_ppm` | u64 | `0` | Weight from transmitted bytes to billing inbound |
+| `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__TX_TO_OUT_PPM` | `collector.traffic.weights.<interface>.tx_to_out_ppm` | u64 | `1000000` | Weight from transmitted bytes to billing outbound |
+
+Use TOML for weights on interfaces with uppercase letters. Figment lowercases environment keys. See [Agent traffic accounting](docs/agent-traffic.md) for seeding, migration, and diagnostics.
+
 ### Internal
 
 > The following variables have sensible defaults and rarely need modification. Only adjust when you have a specific requirement.

@@ -15,6 +15,7 @@ mod run_token_store;
 mod security;
 mod terminal;
 mod traceroute;
+mod traffic;
 mod upgrade;
 
 use std::io::IsTerminal;
@@ -55,6 +56,9 @@ fn flag_value(argv: &[String], flag: &str) -> Option<String> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let argv: Vec<String> = std::env::args().collect();
+    if traffic::cli::run(&argv)? {
+        return Ok(());
+    }
     if crate::upgrade::is_upgrade_probe(&argv) {
         println!("{}", serverbee_common::constants::VERSION);
         return Ok(());
@@ -200,6 +204,8 @@ async fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
+    let traffic = traffic::Monitor::start(&config.collector.traffic)?;
+
     tracing::info!(
         "ServerBee Agent v{} starting...",
         serverbee_common::constants::VERSION
@@ -277,7 +283,7 @@ async fn main() -> anyhow::Result<()> {
         security_tx,
     );
 
-    let mut reporter = Reporter::new(config, capabilities);
+    let mut reporter = Reporter::new(config, capabilities).with_traffic(traffic);
     reporter.run_with_external(Some(security_rx)).await;
     Ok(())
 }

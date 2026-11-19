@@ -28,6 +28,7 @@ use crate::firewall::FirewallManager;
 use crate::firewall::nft::CliNftExecutor;
 use crate::register;
 use crate::terminal::TerminalEvent;
+use crate::traffic::Monitor;
 
 const MAX_BACKOFF_SECS: u64 = 30;
 const JITTER_FACTOR: f64 = 0.2;
@@ -35,6 +36,7 @@ const MAX_REREGISTER_ATTEMPTS: u32 = 3;
 
 pub struct Reporter {
     config: AgentConfig,
+    traffic: Option<Monitor>,
     capabilities: Arc<CapabilityAuthority>,
     firewall_manager: Arc<FirewallManager>,
     #[cfg(test)]
@@ -46,11 +48,17 @@ impl Reporter {
         let firewall_manager = Arc::new(FirewallManager::new(Arc::new(CliNftExecutor)));
         Self {
             config,
+            traffic: None,
             capabilities,
             firewall_manager,
             #[cfg(test)]
             test_terminal_shell: None,
         }
+    }
+
+    pub fn with_traffic(mut self, traffic: Option<Monitor>) -> Self {
+        self.traffic = traffic;
+        self
     }
 
     /// Run with an optional external agent-message stream attached
@@ -354,7 +362,13 @@ impl Reporter {
                     }
                 }
                 _ = report_interval.tick() => {
-                    let report = collector.collect();
+                    let mut report = collector.collect();
+                    if let Some(traffic) = &self.traffic
+                        && let Err(error) = traffic.apply(&mut report)
+                    {
+                        tracing::warn!(%error, "Traffic sample unavailable; skipping report");
+                        continue;
+                    }
                     let msg = AgentMessage::Report(report);
                     send_msg(&mut write, &msg).await?;
                     tracing::debug!("Sent report");

@@ -438,6 +438,46 @@ Server 默认匿名调用 [ipapi.is](https://ipapi.is/developers.html)，每个�
 | `enable_gpu` | bool | `false` | 启用 NVIDIA GPU 监控（需要启用 `gpu` 特性的构建，以及提供 NVML 的 NVIDIA 驱动） |
 | `enable_temperature` | bool | `true` | 启用 CPU 温度传感器监控 |
 
+### `[collector.traffic]` —— 按网卡计量流量
+
+此采集器需在 Linux 上显式启用，按选定网卡采集流量，并在本地台账中保存累计值。关闭或省略此配置时，Agent 沿用原有的全网卡累计值和速率。
+
+| 键 | 环境变量 | 默认值 |
+|----|----------|--------|
+| `enabled` | `SERVERBEE_COLLECTOR__TRAFFIC__ENABLED` | `false` |
+| `include` | `SERVERBEE_COLLECTOR__TRAFFIC__INCLUDE` | `[]`（选中所有可见网卡） |
+| `exclude` | `SERVERBEE_COLLECTOR__TRAFFIC__EXCLUDE` | `[]`（排除优先） |
+| `strict` | `SERVERBEE_COLLECTOR__TRAFFIC__STRICT` | `true`（缺少必选网卡时暂停上报） |
+| `report` | `SERVERBEE_COLLECTOR__TRAFFIC__REPORT` | `"raw"`（用 `"billing"` 上报加权累计值） |
+| `state_dir` | `SERVERBEE_COLLECTOR__TRAFFIC__STATE_DIR` | `"/var/lib/serverbee/traffic"`（绝对路径，由 Agent 用户持有，权限为 `0700`） |
+| `flush_interval_secs` | `SERVERBEE_COLLECTOR__TRAFFIC__FLUSH_INTERVAL_SECS` | `30`（5–3600 秒） |
+
+网卡名精确匹配，区分大小写。若只计量物理网卡，请明确列出要计量的网卡名。Agent 每三秒采样，独立于上报和重连。速率按未经加权的收发增量计算，单位为字节/秒。落盘后更新上报的累计值。
+
+```toml
+[collector.traffic]
+enabled = true
+include = ["ens3"]
+report = "billing"
+
+[collector.traffic.weights.ens3]
+tx_to_out_ppm = 2000000
+```
+
+示例中，`ens3` 每接收一个字节计入站一个字节，每发送一个字节计出站两个字节。倍率按百万分比应用于每次采样的增量（`1000000` = 1 倍）。接收计入站、发送计出站的默认倍率为 `1000000`，两个跨方向倍率默认为 `0`。每项倍率均为 `0` 到 `1000000000` 之间的整数。
+
+倍率对应的环境变量为 `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__RX_TO_IN_PPM`、`SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__RX_TO_OUT_PPM`、`SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__TX_TO_IN_PPM` 和 `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__TX_TO_OUT_PPM`。环境变量的键会转为小写，含大写字母的网卡名请在 TOML 中配置。
+
+启用前，请以 Agent 用户身份在其网络命名空间中运行 `serverbee-agent traffic-check --config /path/to/agent.toml`，随后初始化一次台账。
+
+```bash
+serverbee-agent traffic-seed --config /path/to/agent.toml \
+  --raw-in 0 --raw-out 0 --billing-in 0 --billing-out 0
+serverbee-agent traffic-status --config /path/to/agent.toml
+```
+
+零起点用于全新 Agent。迁移现有 Agent 时，先停止进程，再用 Server 最后接收的绝对累计字节数初始化 `report` 选定的一对值，并保留原身份与配置。配置变更需重启 Agent。切换 `report` 时，需创建新台账，并将最后接收的累计值用作新模式的起点。保留原台账以备审计。
+
 ### `[file]` —— 文件管理
 
 | 键 | 类型 | 默认值 | 说明 |

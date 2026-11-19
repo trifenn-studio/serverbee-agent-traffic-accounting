@@ -1,8 +1,12 @@
+use std::path::Path;
+
 use figment::{
     Figment,
     providers::{Env, Format, Toml},
 };
 use serde::{Deserialize, Serialize};
+
+use crate::traffic::TrafficConfig;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct AgentConfig {
@@ -161,6 +165,8 @@ impl Default for SecurityConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CollectorConfig {
+    #[serde(default)]
+    pub traffic: TrafficConfig,
     #[serde(default = "default_interval")]
     pub interval: u32,
     #[serde(default)]
@@ -288,6 +294,7 @@ fn default_log_level() -> String {
 impl Default for CollectorConfig {
     fn default() -> Self {
         Self {
+            traffic: TrafficConfig::default(),
             interval: 3,
             enable_gpu: false,
             enable_temperature: true,
@@ -297,12 +304,7 @@ impl Default for CollectorConfig {
 
 impl AgentConfig {
     pub fn load() -> anyhow::Result<Self> {
-        let config: Self = Figment::new()
-            .merge(Toml::file("/etc/serverbee/agent.toml"))
-            .merge(Toml::file("agent.toml"))
-            .merge(Env::prefixed("SERVERBEE_").split("__"))
-            .extract()?;
-        Ok(config)
+        Ok(agent_figment(None).extract()?)
     }
 
     pub fn config_path_for_persistence() -> &'static str {
@@ -328,6 +330,17 @@ impl AgentConfig {
     pub(crate) fn token_env_override_present() -> bool {
         std::env::var_os("SERVERBEE_TOKEN").is_some()
     }
+}
+
+pub(crate) fn agent_figment(path: Option<&Path>) -> Figment {
+    let figment = Figment::new();
+    let figment = match path {
+        Some(path) => figment.merge(Toml::file(path)),
+        None => figment
+            .merge(Toml::file("/etc/serverbee/agent.toml"))
+            .merge(Toml::file("agent.toml")),
+    };
+    figment.merge(Env::prefixed("SERVERBEE_").split("__"))
 }
 
 #[cfg(test)]

@@ -438,6 +438,46 @@ By default, the Server calls [ipapi.is](https://ipapi.is/developers.html) anonym
 | `enable_gpu` | bool | `false` | Enable NVIDIA GPU monitoring (requires a build with the `gpu` feature and an NVIDIA driver that provides NVML) |
 | `enable_temperature` | bool | `true` | Enable CPU temperature sensor monitoring |
 
+### `[collector.traffic]` -- Interface Traffic Accounting
+
+This opt-in Linux collector tracks selected interfaces and keeps cumulative counters in a local ledger. When disabled or omitted, the Agent uses its existing all-interface totals and speeds.
+
+| Key | Environment variable | Default |
+|-----|----------------------|---------|
+| `enabled` | `SERVERBEE_COLLECTOR__TRAFFIC__ENABLED` | `false` |
+| `include` | `SERVERBEE_COLLECTOR__TRAFFIC__INCLUDE` | `[]` (all observed interfaces) |
+| `exclude` | `SERVERBEE_COLLECTOR__TRAFFIC__EXCLUDE` | `[]` (exclusion takes priority) |
+| `strict` | `SERVERBEE_COLLECTOR__TRAFFIC__STRICT` | `true` (a missing required interface withholds reports) |
+| `report` | `SERVERBEE_COLLECTOR__TRAFFIC__REPORT` | `"raw"` (use `"billing"` for weighted cumulative totals) |
+| `state_dir` | `SERVERBEE_COLLECTOR__TRAFFIC__STATE_DIR` | `"/var/lib/serverbee/traffic"` (absolute path, Agent-owned, mode `0700`) |
+| `flush_interval_secs` | `SERVERBEE_COLLECTOR__TRAFFIC__FLUSH_INTERVAL_SECS` | `30` (5–3600 seconds) |
+
+Use exact, case-sensitive interface names. For physical-only accounting, explicitly list the interfaces to count. The Agent samples every three seconds, independently of reporting and reconnects. Speeds use unweighted receive and transmit deltas in bytes per second. Cumulative totals update at durable checkpoints.
+
+```toml
+[collector.traffic]
+enabled = true
+include = ["ens3"]
+report = "billing"
+
+[collector.traffic.weights.ens3]
+tx_to_out_ppm = 2000000
+```
+
+The example counts one inbound byte per received byte and two outbound bytes per transmitted byte on `ens3`. Weights apply to each sample's increments in parts per million (`1000000` = 1×). The default receive-to-inbound and transmit-to-outbound weights are `1000000`. The two cross-direction weights default to `0`. Each weight is an integer from `0` to `1000000000`.
+
+Weight environment variables are `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__RX_TO_IN_PPM`, `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__RX_TO_OUT_PPM`, `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__TX_TO_IN_PPM`, and `SERVERBEE_COLLECTOR__TRAFFIC__WEIGHTS__<INTERFACE>__TX_TO_OUT_PPM`. Use TOML for names with uppercase letters because environment keys are lowercased.
+
+Before enabling, run `serverbee-agent traffic-check --config /path/to/agent.toml` as the Agent user in its network namespace, then seed the ledger once.
+
+```bash
+serverbee-agent traffic-seed --config /path/to/agent.toml \
+  --raw-in 0 --raw-out 0 --billing-in 0 --billing-out 0
+serverbee-agent traffic-status --config /path/to/agent.toml
+```
+
+The zero offsets are for a new Agent. For an existing Agent, stop it and seed the pair selected by `report` with the last absolute cumulative byte values accepted by the Server. Preserve its existing identity and config. Restart the Agent to apply policy changes. Changing `report` requires a new ledger seeded with the last accepted pair in the new report mode. Keep the original ledger for its audit history.
+
 ### `[file]` -- File Management
 
 | Key | Type | Default | Description |
