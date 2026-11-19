@@ -18,6 +18,7 @@ env:
 
 jobs:
   preflight:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Release Preflight
     runs-on: ubuntu-latest
     outputs:
@@ -93,6 +94,7 @@ jobs:
         run: cargo clippy --workspace --benches --tests --examples --all-features --locked -- -D warnings
 
   build-linux:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Build (${{ matrix.target }})
     needs: preflight
     runs-on: ubuntu-latest
@@ -148,6 +150,7 @@ jobs:
             target/${{ matrix.target }}/release/serverbee-agent-${{ matrix.suffix }}*
 
   build-other:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Build (${{ matrix.target }})
     needs: preflight
     runs-on: ${{ matrix.os }}
@@ -208,6 +211,7 @@ jobs:
             target/${{ matrix.target }}/release/serverbee-agent-${{ matrix.suffix }}*
 
   docker:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Docker (${{ matrix.component }})
     needs: [preflight, build-linux, build-other]
     runs-on: ubuntu-latest
@@ -279,6 +283,7 @@ jobs:
           tags: ${{ steps.tags.outputs.list }}
 
   release:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Create Release
     needs: [preflight, build-linux, build-other, docker]
     runs-on: ubuntu-latest

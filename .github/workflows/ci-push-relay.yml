@@ -10,6 +10,7 @@ on:
 
 jobs:
   worker:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

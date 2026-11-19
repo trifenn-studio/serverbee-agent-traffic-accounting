@@ -39,6 +39,7 @@ concurrency:
 
 jobs:
   push-trace:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Produce Rust to Relay ciphertext traces
     runs-on: ubuntu-latest
     steps:
@@ -75,6 +76,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
   test:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: iOS Test
     needs: push-trace
     runs-on: macos-15

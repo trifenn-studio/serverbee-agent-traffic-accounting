@@ -68,6 +68,7 @@ concurrency:
 
 jobs:
   docs:
+    if: github.repository == 'ZingerLittleBee/ServerBee'
     name: Build, route, and browser contracts
     runs-on: ubuntu-latest
     steps:
